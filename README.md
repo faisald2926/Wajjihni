@@ -6,7 +6,7 @@
 ![AI Model](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-purple)
 ![Language](https://img.shields.io/badge/Language-TypeScript-blue)
 
-**تم تطويره بواسطة: فيصل الداوود**
+**تم تطويره بواسطة: فيصل الداود**
 
 </div>
 
@@ -39,8 +39,8 @@
 - **التصميم:** Tailwind CSS, Lucide React
 - **الذكاء الاصطناعي:** Google Generative AI SDK (`@google/genai`)
 - **النماذج المستخدمة:** 
-  - `gemini-2.5-flash` (للنصوص والتحليل)
-  - `gemini-2.5-flash-native-audio-preview` (للمحادثة الصوتية الحية)
+- (للنصوص والتحليل) `gemini-2.5-flash`
+- (للمحادثة الصوتية الحية) `gemini-2.5-flash-native-audio-preview` 
 - **الصوت:** Web Audio API (لمعالجة التدفق الصوتي PCM 16kHz)
 
 ## 🚀 طريقة التشغيل (Local Setup)
@@ -55,3 +55,12 @@
    ```bash
    git clone https://github.com/yourusername/wajjihni.git
    cd wajjihni
+### كيف سيظهر هذا الكود في GitHub؟
+عندما تقوم بحفظ الملف، سيظهر بالشكل التالي:
+
+
+3. **إعداد متغيرات البيئة**
+   قم بإنشاء ملف جديد في المجلد الرئيسي (root) باسم `.env.local` وأضف السطر التالي بداخله:
+
+   ```env
+   GEMINI_API_KEY=your_api_key_here
