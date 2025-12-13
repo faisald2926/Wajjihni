@@ -50,11 +50,14 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
   const [interviewTranscript, setInterviewTranscript] = useState('');
   const [interviewEvaluation, setInterviewEvaluation] = useState<InterviewEvaluation | null>(null);
   const [loadingEvaluation, setLoadingEvaluation] = useState(false);
+  
+  // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const timerRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Initial Analysis and Sequential Loading
   useEffect(() => {
@@ -138,9 +141,14 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
     setInterviewTranscript('');
     setInterviewEvaluation(null);
 
-    // 1. Setup Audio Contexts
+    // 1. Setup Audio Contexts IMMEDIATELY on user interaction
     const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 16000});
     const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+    
+    // Resume immediately to unlock audio on browsers
+    await inputCtx.resume();
+    await outputCtx.resume();
+
     inputAudioContextRef.current = inputCtx;
     audioContextRef.current = outputCtx;
     nextStartTimeRef.current = outputCtx.currentTime;
@@ -148,6 +156,7 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
     try {
       // 2. Get User Media
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       
       // 3. Connect to Live API
       const sessionPromise = ai.live.connect({
@@ -155,40 +164,47 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: `
-            You are a senior HR Manager conducting a professional job interview in Arabic.
+            You are a professional HR Manager conducting a job interview in Arabic.
             The job role is: "${targetRole}".
             The candidate is a ${profile.status} in ${profile.major}.
             
-            Start by welcoming the candidate briefly when they speak.
+            Start the conversation by introducing yourself briefly and asking the first question.
             Keep your questions concise.
             Wait for the candidate to answer before asking the next question.
           `,
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
+          speechConfig: {
+            voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Zephyr'}},
+          },
         },
         callbacks: {
           onopen: async () => {
              console.log("Interview Connected");
              
-             // Ensure contexts are running
-             if (outputCtx.state === 'suspended') {
-               await outputCtx.resume();
-             }
-             if (inputCtx.state === 'suspended') {
-               await inputCtx.resume();
-             }
+             // Double check resume
+             if (outputCtx.state === 'suspended') await outputCtx.resume();
+             if (inputCtx.state === 'suspended') await inputCtx.resume();
 
-             // Setup Input Stream
+             // Setup Input Stream - Use smaller buffer for lower latency (512 or 256)
              const source = inputCtx.createMediaStreamSource(stream);
-             const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+             const scriptProcessor = inputCtx.createScriptProcessor(512, 1, 1);
+             
              scriptProcessor.onaudioprocess = (e) => {
-               if (!interviewActive) return; // safety check
                const inputData = e.inputBuffer.getChannelData(0);
                const pcmBlob = createPcmBlob(inputData);
-               sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+               
+               // Only send if session is ready
+               sessionPromise.then(session => {
+                 session.sendRealtimeInput({ media: pcmBlob });
+               }).catch(console.error);
              };
+             
              source.connect(scriptProcessor);
              scriptProcessor.connect(inputCtx.destination);
+             
+             // Send an initial silent message or text to kickstart if needed, 
+             // but usually system instruction + connection is enough.
+             // We will rely on system instruction "Start the conversation..."
+             // but if model doesn't start, we might need to send a dummy input.
           },
           onmessage: async (msg: LiveServerMessage) => {
              // Handle Transcript
@@ -200,27 +216,24 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
              }
 
              // Handle Audio
-             const base64Audio = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-             if (base64Audio) {
+             const audioData = msg.serverContent?.modelTurn?.parts[0]?.inlineData;
+             if (audioData) {
                 const ctx = audioContextRef.current;
                 if(ctx) {
-                   // Ensure context is running if message received
                    if (ctx.state === 'suspended') await ctx.resume();
 
                   // Track start time
                   nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
                   
                   const audioBuffer = await decodeAudioData(
-                    decodeBase64(base64Audio),
+                    decode(audioData.data),
                     ctx,
                     24000,
                     1
                   );
                   const source = ctx.createBufferSource();
                   source.buffer = audioBuffer;
-                  const node = ctx.createGain(); // volume control if needed
-                  source.connect(node);
-                  node.connect(ctx.destination);
+                  source.connect(ctx.destination);
                   
                   source.start(nextStartTimeRef.current);
                   nextStartTimeRef.current += audioBuffer.duration;
@@ -237,7 +250,7 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
                 if(audioContextRef.current) nextStartTimeRef.current = audioContextRef.current.currentTime;
              }
           },
-          onclose: () => console.log("Interview Closed"),
+          onclose: (e) => console.log("Interview Closed", e),
           onerror: (e) => console.error("Interview Error", e)
         }
       });
@@ -269,9 +282,14 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
     if (timerRef.current) clearInterval(timerRef.current);
     
     setInterviewActive(false);
+    sourcesRef.current.clear();
     
     // 2. Generate Evaluation if we have a transcript
     if (interviewTranscript.length > 50) {
@@ -728,20 +746,18 @@ const Dashboard: React.FC<DashboardProps> = ({ profile }) => {
   );
 };
 
-// --- AUDIO HELPER FUNCTIONS ---
-function createPcmBlob(data: Float32Array): Blob {
-  const l = data.length;
-  const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) {
-    int16[i] = data[i] * 32768;
+// --- AUDIO HELPER FUNCTIONS (MATCHING WORKING EXAMPLE EXACTLY) ---
+
+function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-  return {
-    data: btoa(String.fromCharCode(...new Uint8Array(int16.buffer))),
-    mimeType: 'audio/pcm;rate=16000',
-  };
+  return btoa(binary);
 }
 
-function decodeBase64(base64: string) {
+function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -751,25 +767,53 @@ function decodeBase64(base64: string) {
   return bytes;
 }
 
+function createPcmBlob(data: Float32Array): Blob {
+  const l = data.length;
+  const int16 = new Int16Array(l);
+  for (let i = 0; i < l; i++) {
+    // convert float32 -1 to 1 to int16 -32768 to 32767
+    int16[i] = data[i] * 32768;
+  }
+
+  return {
+    data: encode(new Uint8Array(int16.buffer)),
+    mimeType: 'audio/pcm;rate=16000',
+  };
+}
+
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+  const buffer = ctx.createBuffer(
+    numChannels,
+    data.length / 2 / numChannels,
+    sampleRate,
+  );
 
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+  const dataInt16 = new Int16Array(data.buffer);
+  const l = dataInt16.length;
+  const dataFloat32 = new Float32Array(l);
+  for (let i = 0; i < l; i++) {
+    dataFloat32[i] = dataInt16[i] / 32768.0;
+  }
+  
+  // Extract interleaved channels (usually mono in this case)
+  if (numChannels === 0) {
+    buffer.copyToChannel(dataFloat32, 0);
+  } else {
+    for (let i = 0; i < numChannels; i++) {
+      const channel = dataFloat32.filter(
+        (_, index) => index % numChannels === i,
+      );
+      buffer.copyToChannel(channel, i);
     }
   }
+
   return buffer;
 }
-
 
 const NavButton = ({ active, onClick, icon, label }: any) => (
   <button 
@@ -782,7 +826,6 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
   >
     {icon}
     <span className="font-bold whitespace-nowrap hidden md:inline-block">{label}</span>
-    {/* Mobile Label only for active? No, keep layout clean */}
   </button>
 );
 
