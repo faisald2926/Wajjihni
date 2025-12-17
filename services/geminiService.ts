@@ -1,9 +1,11 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, RoadmapStep, ChatMessage, InterviewEvaluation } from "../types";
 
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Using gemini-2.5-flash for basic text tasks (same as working version)
 const MODEL_FAST = "gemini-2.5-flash";
 
 /**
@@ -29,6 +31,7 @@ export const getAssessmentQuestions = async (major: string): Promise<string[]> =
         responseMimeType: "application/json",
       }
     });
+    // Correct usage of .text property
     return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("Assessment Gen Error:", error);
@@ -86,6 +89,7 @@ export const analyzeProfile = async (profile: UserProfile) => {
         responseMimeType: "application/json",
       }
     });
+    // Correct usage of .text property
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Analysis Error:", error);
@@ -125,6 +129,7 @@ export const generateRoadmap = async (profile: UserProfile, targetRole: string):
         responseMimeType: "application/json",
       }
     });
+    // Correct usage of .text property
     return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("Roadmap Error:", error);
@@ -159,6 +164,7 @@ export const evaluateInterview = async (transcript: string, role: string): Promi
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
+    // Correct usage of .text property
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Evaluation Error", error);
@@ -185,31 +191,62 @@ export const chatWithAdvisor = async (history: ChatMessage[], newMessage: string
     }))
   });
 
+  // chat.sendMessage parameter is correct (message)
   const response = await chat.sendMessage({ message: newMessage });
+  // Correct usage of .text property
   return response.text;
 };
 
 /**
- * Generates CV Content.
+ * Generates CV Content based on user inputs - ATS Optimized.
  */
-export const generateCV = async (profile: UserProfile, analysis: any) => {
+export const generateCV = async (profile: UserProfile, analysis: any, cvData: {
+  fullName: string;
+  email: string;
+  phone: string;
+  linkedin: string;
+  education: string;
+  skills: string;
+  experience: string;
+  projects: string;
+  summary: string;
+  language: 'ar' | 'en'
+}) => {
   const prompt = `
-    اكتب سيرة ذاتية (CV) بصيغة Markdown.
-    الاسم: ${profile.name}
-    التخصص: ${profile.major}
-    الوظيفة المستهدفة: ${analysis.recommendedRoles?.[0] || 'عام'}
-    المهارات: ${analysis.strengths?.join(', ')}
+    Create a professional, ATS-optimized CV/Resume in ${cvData.language === 'ar' ? 'Arabic' : 'English'} language.
+    Use clean Markdown formatting that is ATS-friendly.
     
-    ركز على إبراز المشاريع والمهارات التقنية.
+    === USER DATA ===
+    Full Name: ${cvData.fullName}
+    Email: ${cvData.email || 'Not provided'}
+    Phone: ${cvData.phone || 'Not provided'}
+    LinkedIn: ${cvData.linkedin || 'Not provided'}
+    
+    Professional Summary: ${cvData.summary || 'Fresh graduate seeking opportunities'}
+    
+    Education: ${cvData.education || `${profile.major}`}
+    
+    Work Experience: ${cvData.experience || 'No formal experience yet'}
+    
+    Technical Skills: ${cvData.skills || analysis?.strengths?.join(', ') || 'Various skills'}
+    
+    Projects: ${cvData.projects || 'No projects listed'}
+    
+    === AI ANALYSIS ===
+    Target Role: ${analysis?.recommendedRoles?.[0] || 'Professional'}
+    Strengths: ${analysis?.strengths?.join(', ') || 'Not analyzed'}
+    
+    Create sections: Contact, Summary, Education, Experience, Skills, Projects.
+    Use action verbs and ATS-friendly keywords.
   `;
 
   const response = await ai.models.generateContent({
     model: MODEL_FAST,
     contents: prompt,
   });
-  
+
   return response.text;
 };
 
-// Export the initialized AI instance for use in Live API components if needed
+// Export the initialized AI instance
 export { ai };
