@@ -1,0 +1,7 @@
+{
+  "name": "وجهني (Wajjihni)",
+  "description": "منصة ذكية للتوجيه المهني تسد الفجوة بين التعليم وسوق العمل باستخدام الذكاء الاصطناعي.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
