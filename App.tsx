@@ -28,8 +28,8 @@ const App: React.FC = () => {
       )}
 
       {currentView === AppView.Onboarding && (
-        <OnboardingForm 
-          onSubmit={handleFormSubmit} 
+        <OnboardingForm
+          onSubmit={handleFormSubmit}
           onBack={handleBackToLanding}
         />
       )}
