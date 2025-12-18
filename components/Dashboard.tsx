@@ -305,15 +305,6 @@ const Dashboard: React.FC<DashboardProps> = ({ profile, skipAnalysis = false }) 
     <div className="min-h-screen flex flex-col items-center justify-center text-slate-600 bg-slate-50">
       <Loader2 className="w-12 h-12 animate-spin text-teal-600 mb-4" />
       <h2 className="text-xl font-bold">جاري تحليل مسارك المهني...</h2>
-      <button
-        onClick={() => {
-          setAnalysis({ summary: "Test Mode", strengths: ["Test"], recommendedRoles: ["مطور برمجيات"] });
-          setLoadingAnalysis(false);
-        }}
-        className="mt-8 px-6 py-3 bg-teal-600 text-white rounded-full font-bold hover:bg-teal-700 transition-colors text-lg"
-      >
-        🎤 تجاوز واختبار الصوت
-      </button>
     </div>
   );
 
@@ -323,19 +314,6 @@ const Dashboard: React.FC<DashboardProps> = ({ profile, skipAnalysis = false }) 
         <div className="hidden md:flex items-center gap-3 mb-10 px-2">
           <Briefcase className="w-6 h-6 text-teal-700" />
           <h1 className="text-xl font-extrabold">وجهني</h1>
-          <button
-            onClick={() => {
-              // Create a mock analysis if none exists so interview can start
-              if (!analysis) {
-                setAnalysis({ summary: "Test Mode", strengths: ["Test"], recommendedRoles: ["مطور برمجيات"] });
-                setLoadingAnalysis(false);
-              }
-              setActiveTab('interview');
-            }}
-            className="mr-auto px-3 py-1.5 bg-teal-600 text-white text-xs rounded-full font-bold hover:bg-teal-700 transition-colors"
-          >
-            🎤 اختبار
-          </button>
         </div>
         <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar p-1">
           <NavButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<Briefcase size={20} />} label="نظرة عامة" />
@@ -642,3 +620,4 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
 );
 
 export default Dashboard;
+
