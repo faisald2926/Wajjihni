@@ -5,6 +5,7 @@
 ![Project Status](https://img.shields.io/badge/Status-Prototype-teal)
 ![AI Model](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-purple)
 ![Language](https://img.shields.io/badge/Language-TypeScript-blue)
+[![CI](https://github.com/faisald2926/Wajjihni/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/faisald2926/Wajjihni/actions/workflows/ci.yml)
 
 **تم تطويره بواسطة: فيصل الداود**
 
