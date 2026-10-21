@@ -53,11 +53,14 @@
 
 1. **نسخ المستودع (Clone)**
    ```bash
-   git clone https://github.com/yourusername/wajjihni.git
-   cd wajjihni
-### كيف سيظهر هذا الكود في GitHub؟
-عندما تقوم بحفظ الملف، سيظهر بالشكل التالي:
+   git clone https://github.com/faisald2926/Wajjihni.git
+   cd Wajjihni
+   ```
 
+2. **تثبيت الحزم**
+   ```bash
+   npm install
+   ```
 
 3. **إعداد متغيرات البيئة**
    قم بإنشاء ملف جديد في المجلد الرئيسي (root) باسم `.env.local` وأضف السطر التالي بداخله:
